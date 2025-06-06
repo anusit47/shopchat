@@ -45,6 +45,7 @@ const escapeRegExp = (string: string): string => {
 };
 
 // API endpoint สำหรับค้นหาสินค้าด้วยชื่อ
+// API endpoint สำหรับค้นหาสินค้าด้วยชื่อแบบยืดหยุ่น
 app.get("/api/products/search", async (req: Request, res: Response): Promise<void> => {
   try {
     const { product_name } = req.query;
@@ -58,29 +59,87 @@ app.get("/api/products/search", async (req: Request, res: Response): Promise<voi
     }
     
     // Clean up the input string
-    const cleanedInput = String(product_name).replace(/['"]/g, '');
+    const cleanedInput = String(product_name).trim().replace(/['"]/g, '');
     
-    // Try exact match first
-    let products = await ProductSku.find({
-      product_name: cleanedInput
-    }).limit(1);
+    // 1. ลองค้นหาแบบตรงเป๊ะก่อน
+    let product = await ProductSku.findOne({
+      product_name: { $regex: new RegExp(`^${escapeRegExp(cleanedInput)}$`, 'i') }
+    });
     
-    // If no exact match, fall back to partial search
-    if (products.length === 0) {
-      const searchTerms = cleanedInput.split(' ').filter(term => term.length > 1);
-      const searchQuery = {
-        $or: searchTerms.map(term => ({
-          product_name: { $regex: escapeRegExp(term), $options: "i" }
-        }))
-      };
-      products = await ProductSku.find(searchQuery).limit(5);
+    // 2. ถ้าไม่เจอ ลองค้นหาแบบมีคำนั้นอยู่ในชื่อ
+    if (!product) {
+      product = await ProductSku.findOne({
+        product_name: { $regex: new RegExp(`\\b${escapeRegExp(cleanedInput)}\\b`, 'i') }
+      });
     }
     
-    res.status(200).json({
-      success: true,
-      count: products.length,
-      data: products
-    });
+    // 3. ถ้ายังไม่เจอ ลองค้นหาแบบมีส่วนของคำนั้นอยู่ในชื่อ
+    if (!product) {
+      product = await ProductSku.findOne({
+        product_name: { $regex: new RegExp(escapeRegExp(cleanedInput), 'i') }
+      });
+    }
+    
+    // 4. ถ้ายังไม่เจอ ใช้วิธีแยกคำและให้คะแนนความเกี่ยวข้อง
+    if (!product) {
+      const searchTerms = cleanedInput.split(' ').filter(term => term.length > 1);
+      
+      // หาสินค้าที่มีคำใดคำหนึ่งตรงกับคำค้นหา
+      const potentialMatches = await ProductSku.find({
+        $or: searchTerms.map(term => ({
+          product_name: { $regex: new RegExp(escapeRegExp(term), 'i') }
+        }))
+      }).limit(20); // ดึงมาจำนวนหนึ่งเพื่อเปรียบเทียบ
+      
+      if (potentialMatches.length > 0) {
+        // คำนวณคะแนนความเกี่ยวข้องสำหรับแต่ละสินค้า
+        const scoredProducts = potentialMatches.map(prod => {
+          const productNameLower = prod.product_name.toLowerCase();
+          let score = 0;
+          
+          // ให้คะแนนตามจำนวนคำที่ตรงกัน
+          searchTerms.forEach(term => {
+            const termLower = term.toLowerCase();
+            if (productNameLower.includes(termLower)) {
+              score += 1;
+              
+              // ให้คะแนนเพิ่มถ้าคำอยู่ติดกัน
+              if (productNameLower.includes(cleanedInput.toLowerCase())) {
+                score += 3;
+              }
+              
+              // ให้คะแนนเพิ่มถ้าเป็นคำที่ขึ้นต้นชื่อสินค้า
+              if (productNameLower.startsWith(termLower)) {
+                score += 2;
+              }
+            }
+          });
+          
+          return { product: prod, score };
+        });
+        
+        // เรียงลำดับตามคะแนน
+        scoredProducts.sort((a, b) => b.score - a.score);
+        
+        // เลือกสินค้าที่มีคะแนนสูงสุด
+        product = scoredProducts[0].product;
+      }
+    }
+    
+    // ส่งผลลัพธ์กลับไป
+    if (product) {
+      res.status(200).json({
+        success: true,
+        count: 1,
+        data: [product]
+      });
+    } else {
+      res.status(200).json({
+        success: true,
+        count: 0,
+        data: []
+      });
+    }
     
   } catch (error) {
     console.error("Error searching products:", error);
