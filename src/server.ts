@@ -158,6 +158,46 @@ app.get("/api/products/search", async (req: Request, res: Response): Promise<voi
   }
 });
 
+// API endpoint สำหรับค้นหาสินค้าตาม SKU code
+// ตัวอย่างเช่น /api/products/12345
+app.get("/api/products/:sku_code", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sku_code } = req.params;
+    
+    if (!sku_code) {
+      res.status(400).json({
+        success: false,
+        message: "กรุณาระบุ SKU code ที่ต้องการค้นหา"
+      });
+      return;
+    }
+    
+    const product = await ProductSku.findOne(
+      { code: sku_code },
+      { _id: 0, __v: 0 }
+    );
+    
+    if (!product) {
+      res.status(404).json({
+        success: false,
+        message: `ไม่พบสินค้าที่มี SKU code ${sku_code}`
+      });
+      return;
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: product
+    });
+  } catch (error) {
+    console.error("Error fetching product by SKU code:", error);
+    res.status(500).json({
+      success: false,
+      message: "เกิดข้อผิดพลาดในการดึงข้อมูลสินค้า"
+    });
+  }
+});
+
 // Function to process manual text into chunks with page tracking
 async function processManualIntoChunks(pages: Array<{pageNumber: number, mdText: string}>) {
   const splitter = new RecursiveCharacterTextSplitter({
