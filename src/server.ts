@@ -159,7 +159,6 @@ app.get("/api/products/search", async (req: Request, res: Response): Promise<voi
 });
 
 // API endpoint สำหรับค้นหาสินค้าตาม SKU code
-// ตัวอย่างเช่น /api/products/12345
 app.get("/api/products/:sku_code", async (req: Request, res: Response): Promise<void> => {
   try {
     const { sku_code } = req.params;
@@ -196,159 +195,159 @@ app.get("/api/products/:sku_code", async (req: Request, res: Response): Promise<
       message: "เกิดข้อผิดพลาดในการดึงข้อมูลสินค้า"
     });
   }
-});
+}); 
 
-// Function to process manual text into chunks with page tracking
-async function processManualIntoChunks(pages: Array<{pageNumber: number, mdText: string}>) {
-  const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 1000,
-    chunkOverlap: 200,
-    separators: ["\n## ", "\n### ", "\n#### ", "\n", " ", ""]
-  });
+// // Function to process manual text into chunks with page tracking
+// async function processManualIntoChunks(pages: Array<{pageNumber: number, mdText: string}>) {
+//   const splitter = new RecursiveCharacterTextSplitter({
+//     chunkSize: 1000,
+//     chunkOverlap: 200,
+//     separators: ["\n## ", "\n### ", "\n#### ", "\n", " ", ""]
+//   });
 
-  const chunksByPage: Array<{content: string, pageNumber: number}> = [];
+//   const chunksByPage: Array<{content: string, pageNumber: number}> = [];
   
-  // Process each page separately to maintain page number association
-  for (const page of pages) {
-    const pageChunks = await splitter.createDocuments([page.mdText]);
+//   // Process each page separately to maintain page number association
+//   for (const page of pages) {
+//     const pageChunks = await splitter.createDocuments([page.mdText]);
     
-    // Associate each chunk with its page number
-    const pageProcessedChunks = pageChunks.map(chunk => ({
-      content: chunk.pageContent,
-      pageNumber: page.pageNumber
-    }));
+//     // Associate each chunk with its page number
+//     const pageProcessedChunks = pageChunks.map(chunk => ({
+//       content: chunk.pageContent,
+//       pageNumber: page.pageNumber
+//     }));
     
-    chunksByPage.push(...pageProcessedChunks);
-  }
+//     chunksByPage.push(...pageProcessedChunks);
+//   }
 
-  return chunksByPage;
-}
+//   return chunksByPage;
+// }
 
-// Function to upload segments to Dify
-async function uploadSegmentsToDify(documentId: string, segments: Array<{content: string, pageNumber: number}>) {
-  try {
-    if (!DIFY_API_KEY || !DATASET_ID) {
-      throw new Error('Missing Dify API configuration');
-    }
+// // Function to upload segments to Dify
+// async function uploadSegmentsToDify(documentId: string, segments: Array<{content: string, pageNumber: number}>) {
+//   try {
+//     if (!DIFY_API_KEY || !DATASET_ID) {
+//       throw new Error('Missing Dify API configuration');
+//     }
 
-    const formattedSegments = segments.map(seg => ({
-      content: seg.content,
-      keywords: [`page:${seg.pageNumber}`, `${seg.pageNumber}`]
-    }));
+//     const formattedSegments = segments.map(seg => ({
+//       content: seg.content,
+//       keywords: [`page:${seg.pageNumber}`, `${seg.pageNumber}`]
+//     }));
 
-    const response = await axios.post(
-      `${DIFY_BASE_URL}/datasets/${DATASET_ID}/documents/${documentId}/segments`,
-      { segments: formattedSegments },
-      {
-        headers: {
-          Authorization: `Bearer ${DIFY_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
+//     const response = await axios.post(
+//       `${DIFY_BASE_URL}/datasets/${DATASET_ID}/documents/${documentId}/segments`,
+//       { segments: formattedSegments },
+//       {
+//         headers: {
+//           Authorization: `Bearer ${DIFY_API_KEY}`,
+//           "Content-Type": "application/json"
+//         }
+//       }
+//     );
 
-    return response.data.data;
-  } catch (error: any) {
-    console.error("Failed to upload segments to Dify:", error.response?.data || error.message);
-    throw error;
-  }
-}
+//     return response.data.data;
+//   } catch (error: any) {
+//     console.error("Failed to upload segments to Dify:", error.response?.data || error.message);
+//     throw error;
+//   }
+// }
 
-// API endpoint to process manual from product_sku and upload to Dify
-app.post('/api/manuals/upload', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { product_sku, document_id } = req.body;
+// // API endpoint to process manual from product_sku and upload to Dify
+// app.post('/api/manuals/upload', async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     const { product_sku, document_id } = req.body;
 
-    if (!product_sku || !document_id) {
-      res.status(400).json({ 
-        success: false, 
-        message: 'Missing required fields: product_sku, document_id' 
-      });
-      return;
-    }
+//     if (!product_sku || !document_id) {
+//       res.status(400).json({ 
+//         success: false, 
+//         message: 'Missing required fields: product_sku, document_id' 
+//       });
+//       return;
+//     }
 
-    // Find the product by SKU code
-    const product = await ProductSku.findOne({ code: product_sku });
+//     // Find the product by SKU code
+//     const product = await ProductSku.findOne({ code: product_sku });
     
-    if (!product) {
-      res.status(404).json({
-        success: false,
-        message: `Product with SKU code ${product_sku} not found`
-      });
-      return;
-    }
+//     if (!product) {
+//       res.status(404).json({
+//         success: false,
+//         message: `Product with SKU code ${product_sku} not found`
+//       });
+//       return;
+//     }
 
-    // Find the manual using the manual_id from the product
-    const manual = await Manual.findById(product.manual_id);
+//     // Find the manual using the manual_id from the product
+//     const manual = await Manual.findById(product.manual_id);
     
-    if (!manual || !manual.pages || manual.pages.length === 0) {
-      res.status(404).json({
-        success: false,
-        message: `No manual found for product ${product_sku}`
-      });
-      return;
-    }
+//     if (!manual || !manual.pages || manual.pages.length === 0) {
+//       res.status(404).json({
+//         success: false,
+//         message: `No manual found for product ${product_sku}`
+//       });
+//       return;
+//     }
 
-    // Sort pages by page number to ensure correct order
-    const sortedPages = [...manual.pages].sort((a, b) => a.pageNumber - b.pageNumber);
+//     // Sort pages by page number to ensure correct order
+//     const sortedPages = [...manual.pages].sort((a, b) => a.pageNumber - b.pageNumber);
     
-    // Process each page into chunks while maintaining page number association
-    const chunks = await processManualIntoChunks(sortedPages);
+//     // Process each page into chunks while maintaining page number association
+//     const chunks = await processManualIntoChunks(sortedPages);
     
-    // Upload chunks to Dify
-    const uploadedSegments = await uploadSegmentsToDify(document_id, chunks);
+//     // Upload chunks to Dify
+//     const uploadedSegments = await uploadSegmentsToDify(document_id, chunks);
     
-    // Save segment information to MongoDB
-    const segmentPromises = uploadedSegments.map(async (segment: any, index: number) => {
-      const correspondingChunk = chunks[index];
+//     // Save segment information to MongoDB
+//     const segmentPromises = uploadedSegments.map(async (segment: any, index: number) => {
+//       const correspondingChunk = chunks[index];
       
-      // Check if this segment already exists
-      const existingSegment = await ManualSegment.findOne({ segment_id: segment.id });
+//       // Check if this segment already exists
+//       const existingSegment = await ManualSegment.findOne({ segment_id: segment.id });
       
-      if (existingSegment) {
-        // Update existing segment
-        existingSegment.content = segment.content;
-        existingSegment.page_number = correspondingChunk.pageNumber;
-        existingSegment.keywords = segment.keywords || [];
-        return existingSegment.save();
-      } else {
-        // Create new segment
-        const manualSegment = new ManualSegment({
-          manual_id: manual._id,
-          segment_id: segment.id,
-          page_number: correspondingChunk.pageNumber,
-          content: segment.content,
-          keywords: segment.keywords || []
-        });
+//       if (existingSegment) {
+//         // Update existing segment
+//         existingSegment.content = segment.content;
+//         existingSegment.page_number = correspondingChunk.pageNumber;
+//         existingSegment.keywords = segment.keywords || [];
+//         return existingSegment.save();
+//       } else {
+//         // Create new segment
+//         const manualSegment = new ManualSegment({
+//           manual_id: manual._id,
+//           segment_id: segment.id,
+//           page_number: correspondingChunk.pageNumber,
+//           content: segment.content,
+//           keywords: segment.keywords || []
+//         });
         
-        return manualSegment.save();
-      }
-    });
+//         return manualSegment.save();
+//       }
+//     });
     
-    await Promise.all(segmentPromises);
+//     await Promise.all(segmentPromises);
 
-    // Update product with reference to manual if not already set
-    if (!product.manual_id) {
-      product.manual_id = manual._id;
-      await product.save();
-    }
+//     // Update product with reference to manual if not already set
+//     if (!product.manual_id) {
+//       product.manual_id = manual._id;
+//       await product.save();
+//     }
 
-    res.status(201).json({
-      success: true,
-      message: 'Manual processed and uploaded to Dify successfully',
-      product_name: product.product_name,
-      manual_id: manual._id,
-      segments_count: uploadedSegments.length
-    });
-  } catch (error) {
-    console.error('Error processing manual:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to process and upload manual',
-      error: (error instanceof Error) ? error.message : String(error)
-    });
-  }
-});
+//     res.status(201).json({
+//       success: true,
+//       message: 'Manual processed and uploaded to Dify successfully',
+//       product_name: product.product_name,
+//       manual_id: manual._id,
+//       segments_count: uploadedSegments.length
+//     });
+//   } catch (error) {
+//     console.error('Error processing manual:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Failed to process and upload manual',
+//       error: (error instanceof Error) ? error.message : String(error)
+//     });
+//   }
+// });
 
 // API endpoint to get page number from segment_id
 // app.get('/api/segments/:segment_id', async (req: Request, res: Response): Promise<void> => {
@@ -386,6 +385,265 @@ app.post('/api/manuals/upload', async (req: Request, res: Response): Promise<voi
 //     return;
 //   }
 // });
+
+// Function to process manual text into chunks with page tracking
+async function processManualIntoChunks(pages: Array<{pageNumber: number, mdText: string}>) {
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1000,
+    chunkOverlap: 200,
+    separators: ["\n## ", "\n### ", "\n#### ", "\n", " ", ""]
+  });
+
+  const chunksByPage: Array<{content: string, pageNumber: number}> = [];
+  
+  // Process each page separately to maintain page number association
+  for (const page of pages) {
+    const pageChunks = await splitter.createDocuments([page.mdText]);
+    
+    // Associate each chunk with its page number
+    const pageProcessedChunks = pageChunks.map(chunk => ({
+      content: chunk.pageContent,
+      pageNumber: page.pageNumber
+    }));
+    
+    chunksByPage.push(...pageProcessedChunks);
+  }
+
+  return chunksByPage;
+}
+
+// Function to create a new document in Dify
+async function createDifyDocument(productName: string): Promise<string> {
+  try {
+    if (!DIFY_API_KEY || !DATASET_ID) {
+      throw new Error('Missing Dify API configuration');
+    }
+
+    console.log(`Creating new Dify document for product: ${productName}`);
+    
+    const response = await axios.post(
+      `${DIFY_BASE_URL}/datasets/${DATASET_ID}/document/create-by-text`,
+      {
+        name: `Manual for ${productName}`,
+        text: "Initializing document...",
+        indexing_technique: "high_quality",
+        doc_form: "text_model",
+        process_rule: { mode: "automatic" }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${DIFY_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const documentId = response.data.document.id;
+    console.log(`Created Dify document with ID: ${documentId}`);
+    
+    return documentId;
+  } catch (error: any) {
+    console.error("Failed to create Dify document:", error.response?.data || error.message);
+    throw error;
+  }
+}
+
+// Function to upload segments to Dify
+async function uploadSegmentsToDify(documentId: string, segments: Array<{content: string, pageNumber: number}>) {
+  try {
+    if (!DIFY_API_KEY || !DATASET_ID) {
+      throw new Error('Missing Dify API configuration');
+    }
+
+    const formattedSegments = segments.map(seg => ({
+      content: seg.content,
+      keywords: [`page:${seg.pageNumber}`, `${seg.pageNumber}`]
+    }));
+
+    console.log(`Uploading ${formattedSegments.length} segments to Dify document ${documentId}`);
+    
+    const response = await axios.post(
+      `${DIFY_BASE_URL}/datasets/${DATASET_ID}/documents/${documentId}/segments`,
+      { segments: formattedSegments },
+      {
+        headers: {
+          Authorization: `Bearer ${DIFY_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    console.log(`Successfully uploaded segments to document ${documentId}`);
+    return response.data.data;
+  } catch (error: any) {
+    console.error("Failed to upload segments to Dify:", error.response?.data || error.message);
+    throw error;
+  }
+}
+
+// Function to check document status
+async function checkDocumentStatus(documentId: string): Promise<boolean> {
+  try {
+    if (!DIFY_API_KEY || !DATASET_ID) {
+      throw new Error('Missing Dify API configuration');
+    }
+
+    console.log(`Checking status of document ${documentId}...`);
+    
+    // Get the list of documents and filter for our document ID
+    const response = await axios.get(
+      `${DIFY_BASE_URL}/datasets/${DATASET_ID}/documents`,
+      {
+        headers: {
+          Authorization: `Bearer ${DIFY_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    // Find our document in the list
+    const document = response.data.data.find((doc: any) => doc.id === documentId);
+    
+    if (!document) {
+      console.error(`Document ${documentId} not found in the dataset`);
+      return false;
+    }
+
+    const status = document.indexing_status;
+    console.log(`Document ${documentId} status: ${status}`);
+    
+    // Return true if document is completed/ready
+    return status === "completed" || status === "available";
+  } catch (error: any) {
+    console.error("Failed to check document status:", error.response?.data || error.message);
+    return false;
+  }
+}
+
+// Function to wait for document to be ready
+async function waitForDocumentReady(documentId: string, maxRetries = 15, delay = 3000): Promise<boolean> {
+  console.log(`Waiting for document ${documentId} to be ready...`);
+  
+  for (let i = 0; i < maxRetries; i++) {
+    const isReady = await checkDocumentStatus(documentId);
+    if (isReady) {
+      console.log(`Document ${documentId} is ready!`);
+      return true;
+    }
+    
+    console.log(`Document not ready yet, retrying in ${delay/1000} seconds... (${i+1}/${maxRetries})`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+  
+  console.error(`Document ${documentId} not ready after ${maxRetries} attempts`);
+  return false;
+}
+
+
+// API endpoint to process manual from product_sku and upload to Dify
+app.post('/api/segments/upload', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { product_sku } = req.body;
+
+    if (!product_sku) {
+      res.status(400).json({ 
+        success: false, 
+        message: 'Missing required field: product_sku' 
+      });
+      return;
+    }
+
+    // Find the product by SKU code
+    const product = await ProductSku.findOne({ code: product_sku });
+    
+    if (!product) {
+      res.status(404).json({
+        success: false,
+        message: `Product with SKU code ${product_sku} not found`
+      });
+      return;
+    }
+
+    // Find the manual using the manual_id from the product
+    const manual = await Manual.findById(product.manual_id);
+    
+    if (!manual || !manual.pages || manual.pages.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: `No manual found for product ${product_sku}`
+      });
+      return;
+    }
+
+    const productName = product.product_name || 'Unknown Product';
+
+    // Create a new document in Dify
+    const documentId = await createDifyDocument(productName);
+
+    // Wait for document to be ready before proceeding
+    const isDocumentReady = await waitForDocumentReady(documentId);
+    
+    if (!isDocumentReady) {
+      res.status(500).json({
+        success: false,
+        message: 'Document creation timed out, please try again later',
+        document_id: documentId
+      });
+      return;
+    }
+
+    // Sort pages by page number to ensure correct order
+    const sortedPages = [...manual.pages].sort((a, b) => a.pageNumber - b.pageNumber);
+    
+    // Process each page into chunks while maintaining page number association
+    const chunks = await processManualIntoChunks(sortedPages);
+    
+    // Upload chunks to Dify
+    const uploadedSegments = await uploadSegmentsToDify(documentId, chunks);
+    
+    // Save segment information to MongoDB
+    const segmentPromises = uploadedSegments.map(async (segment: any, index: number) => {
+      const correspondingChunk = chunks[index];
+      
+      // Create new segment
+      const manualSegment = new ManualSegment({
+        manual_id: manual._id,
+        document_id: documentId,
+        segment_id: segment.id,
+        page_number: correspondingChunk.pageNumber,
+        content: segment.content,
+        keywords: segment.keywords || []
+      });
+      
+      return manualSegment.save();
+    });
+    
+    await Promise.all(segmentPromises);
+
+    // Update product with reference to manual if not already set
+    if (!product.manual_id) {
+      product.manual_id = manual._id;
+      await product.save();
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Manual processed and uploaded to Dify successfully',
+      product_name: product.product_name,
+      manual_id: manual._id,
+      document_id: documentId,
+      segments_count: uploadedSegments.length
+    });
+  } catch (error) {
+    console.error('Error processing manual:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process and upload manual',
+      error: (error instanceof Error) ? error.message : String(error)
+    });
+  }
+});
+
 
 // API endpoint สำหรับดึงรูปภาพจากหลาย segment_id
 app.post("/api/segments/images", async (req: Request, res: Response): Promise<void> => {

@@ -40,7 +40,7 @@ async function importAdviceProducts() {
     }
 
     // Read the JSON file
-    const filePath = path.resolve(process.cwd(), 'data/advice_nb_master_data.json');
+    const filePath = path.resolve(process.cwd(), 'data/advice_nb_master_data2.json');
     console.log(`Reading file: ${filePath}`);
     
     const fileData = fs.readFileSync(filePath, 'utf8');
