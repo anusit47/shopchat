@@ -541,6 +541,7 @@ async function waitForDocumentReady(documentId: string, maxRetries = 15, delay =
 
 
 // API endpoint to process manual from product_sku and upload to Dify
+// example post body: { "product_sku": "SKU12345" }
 app.post('/api/segments/upload', async (req: Request, res: Response): Promise<void> => {
   try {
     const { product_sku } = req.body;
@@ -644,7 +645,6 @@ app.post('/api/segments/upload', async (req: Request, res: Response): Promise<vo
   }
 });
 
-
 // API endpoint สำหรับดึงรูปภาพจากหลาย segment_id
 app.post("/api/segments/images", async (req: Request, res: Response): Promise<void> => {
   try {
@@ -696,75 +696,54 @@ app.post("/api/segments/images", async (req: Request, res: Response): Promise<vo
       const segment = segmentMap.get(segmentId);
       
       if (!segment) {
-        return {
-          segment_id: segmentId,
-          found: false,
-          message: "ไม่พบข้อมูล segment"
-        };
+        return null; // ไม่พบ segment
       }
 
       const manual = manualMap.get(segment.manual_id.toString());
       
       if (!manual) {
-        return {
-          segment_id: segmentId,
-          found: false,
-          message: "ไม่พบข้อมูลคู่มือ"
-        };
+        return null; // ไม่พบคู่มือ
       }
 
       // ค้นหาหน้าที่ตรงกับ page_number ของ segment
       interface ManualPage {
         pageNumber: number;
-        mdText?: string;
-        imgUrl?: string;
-      }
-
-      interface ManualType {
-        _id: any;
-        pages: ManualPage[];
-      }
-
-      interface SegmentType {
-        segment_id: string;
-        manual_id: any;
-        page_number: number;
-        content?: string;
-        keywords?: string[];
-      }
-
-      const page: ManualPage | undefined = (manual as ManualType).pages.find(
-        (p: ManualPage) => p.pageNumber === (segment as SegmentType).page_number
-      );
-      
-      if (!page || !page.imgUrl) {
-        return {
-          segment_id: segmentId,
-          found: false,
-          message: "ไม่พบรูปภาพ"
+        hasImg?: boolean;
+        imgData?: {
+          fileName: string;
+          [key: string]: any;
         };
+        mdText?: string;
+        [key: string]: any;
       }
+
+            const page: ManualPage | undefined = manual.pages.find(
+              (p: ManualPage) => p.pageNumber === segment.page_number
+            );
+      
+      // ตรวจสอบว่ามีรูปภาพหรือไม่ตามโครงสร้างใหม่
+      if (!page || !page.hasImg || !page.imgData || !page.imgData.fileName) {
+        return null; // ไม่พบรูปภาพ
+      }
+
+      // สร้าง URL สำหรับรูปภาพจาก fileName
+      const imgUrl = `http://dev-api-chobchat.covestlabs.com/api/file/${page.imgData.fileName}`;
 
       return {
         segment_id: segmentId,
-        found: true,
-        imgUrl: page.imgUrl,
+        imgUrl: imgUrl,
         pageNumber: segment.page_number
       };
     });
 
     // กรองเฉพาะผลลัพธ์ที่มีรูปภาพ
-    const imagesFound = results.filter(result => result.found);
+    const imagesFound = results.filter(result => result !== null);
 
     res.status(200).json({
       success: true,
       total_segments: segment_ids.length,
       images_found: imagesFound.length,
-      images: imagesFound.map(result => ({
-        segment_id: result.segment_id,
-        imgUrl: result.imgUrl,
-        pageNumber: result.pageNumber
-      }))
+      images: imagesFound
     });
     
   } catch (error) {
@@ -776,6 +755,7 @@ app.post("/api/segments/images", async (req: Request, res: Response): Promise<vo
     });
   }
 });
+
 
 
 // // API endpoint to get all segments for a manual
